@@ -73,3 +73,103 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-natural-accent);
 }
+
+/* ----------------------------------------------------
+   ACCESSIBILITY OVERRIDES (WCAG 2.1 AA/AAA COMPLIANCE)
+   ---------------------------------------------------- */
+
+/* 1. Font Scale Modifiers */
+.accessibility-scale-large h1 { font-size: 2.25rem !important; }
+.accessibility-scale-large h2 { font-size: 1.75rem !important; }
+.accessibility-scale-large h3 { font-size: 1.5rem !important; }
+.accessibility-scale-large h4 { font-size: 1.25rem !important; }
+.accessibility-scale-large p, 
+.accessibility-scale-large span, 
+.accessibility-scale-large button, 
+.accessibility-scale-large li,
+.accessibility-scale-large input,
+.accessibility-scale-large textarea,
+.accessibility-scale-large div:not([role="img"]) { 
+  font-size: 1.05rem !important; 
+  line-height: 1.65 !important;
+}
+
+.accessibility-scale-huge h1 { font-size: 2.75rem !important; }
+.accessibility-scale-huge h2 { font-size: 2.1rem !important; }
+.accessibility-scale-huge h3 { font-size: 1.85rem !important; }
+.accessibility-scale-huge h4 { font-size: 1.5rem !important; }
+.accessibility-scale-huge p, 
+.accessibility-scale-huge span, 
+.accessibility-scale-huge button, 
+.accessibility-scale-huge li,
+.accessibility-scale-huge input,
+.accessibility-scale-huge textarea,
+.accessibility-scale-huge div:not([role="img"]) { 
+  font-size: 1.2rem !important; 
+  line-height: 1.8 !important;
+}
+
+/* 2. Dyslexia / Readable Font Override (Wide spacing + Sans-Serif everywhere) */
+.accessibility-readability,
+.accessibility-readability * {
+  font-family: var(--font-sans) !important;
+  letter-spacing: 0.04em !important;
+  word-spacing: 0.08em !important;
+}
+
+/* 3. Enhanced Contrast (Darker Text on pure White) */
+.accessibility-high-contrast {
+  --color-natural-bg: #FFFFFF !important;
+  --color-natural-text: #000000 !important;
+  --color-natural-accent: #000000 !important;
+  --color-natural-sidebar: #FAFAFA !important;
+  --color-natural-border: #111111 !important;
+  --color-natural-dark: #000000 !important;
+  --color-natural-light: #FFFFFF !important;
+  --color-natural-card: #FFFFFF !important;
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+.accessibility-high-contrast * {
+  border-color: #000000 !important;
+}
+
+.accessibility-high-contrast p,
+.accessibility-high-contrast span,
+.accessibility-high-contrast h1,
+.accessibility-high-contrast h2,
+.accessibility-high-contrast h3,
+.accessibility-high-contrast h4,
+.accessibility-high-contrast h5,
+.accessibility-high-contrast h6,
+.accessibility-high-contrast label,
+.accessibility-high-contrast input,
+.accessibility-high-contrast textarea,
+.accessibility-high-contrast button {
+  color: #000000 !important;
+}
+
+.accessibility-high-contrast button,
+.accessibility-high-contrast input,
+.accessibility-high-contrast textarea {
+  background-color: #FFFFFF !important;
+  border-width: 2px !important;
+  border-color: #000000 !important;
+}
+
+.accessibility-high-contrast button:hover {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+.accessibility-high-contrast button:hover * {
+  color: #FFFFFF !important;
+}
+
+/* Visual cue for focus styles */
+:focus-visible {
+  outline: 3px solid #7D7C6E !important;
+  outline-offset: 2px !important;
+}
+

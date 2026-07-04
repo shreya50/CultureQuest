@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Compass, Sparkles, MapPin, Search, ArrowLeft, Landmark, Eye, Calendar, BookOpen, Heart, Volume2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Compass, Sparkles, MapPin, Search, ArrowLeft, Landmark, Eye, Calendar, BookOpen, Heart, Volume2, VolumeX, AlertCircle, RefreshCw, Accessibility } from 'lucide-react';
 import { DiscoveryResponse, ChatMessage, ImmersiveStory } from './types';
 import InteractiveMap from './components/InteractiveMap';
 import VirtualGuideChat from './components/VirtualGuideChat';
@@ -51,6 +51,57 @@ export default function App() {
 
   // Tabs for the details pane
   const [activeTab, setActiveTab] = useState<'attractions' | 'gems' | 'events' | 'mindful' | 'story'>('attractions');
+
+  // Accessibility States
+  const [fontSize, setFontSize] = useState<'normal' | 'large' | 'huge'>('normal');
+  const [highContrast, setHighContrast] = useState(false);
+  const [readabilityFont, setReadabilityFont] = useState(false);
+  const [ttsSpeechEnabled, setTtsSpeechEnabled] = useState(false);
+  const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
+  const [isAccessibilityMenuOpen, setIsAccessibilityMenuOpen] = useState(false);
+
+  // Stop any active speech on unmount or city change
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [currentDiscovery]);
+
+  const handleToggleSpeak = (text: string, identifier: string) => {
+    if (!window.speechSynthesis) return;
+
+    if (currentlySpeaking === identifier) {
+      window.speechSynthesis.cancel();
+      setCurrentlySpeaking(null);
+    } else {
+      window.speechSynthesis.cancel();
+      
+      // Clean up text if it contains markdown or HTML tags
+      const cleanText = text.replace(/[*#_`\-]/g, '');
+      
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 0.95;
+      utterance.onend = () => {
+        setCurrentlySpeaking(null);
+      };
+      utterance.onerror = () => {
+        setCurrentlySpeaking(null);
+      };
+      setCurrentlySpeaking(identifier);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const getAccessibilityClasses = () => {
+    let classes = "";
+    if (fontSize === 'large') classes += " accessibility-scale-large";
+    if (fontSize === 'huge') classes += " accessibility-scale-huge";
+    if (readabilityFont) classes += " accessibility-readability";
+    if (highContrast) classes += " accessibility-high-contrast";
+    return classes;
+  };
 
   // Load search history from local storage on mount
   useEffect(() => {
@@ -237,7 +288,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F7F2] text-[#4A443F] font-sans selection:bg-[#EBE9E1] selection:text-[#2C2926] pb-16" id="app-root">
+    <div className={`min-h-screen bg-[#F8F7F2] text-[#4A443F] font-sans selection:bg-[#EBE9E1] selection:text-[#2C2926] pb-16 transition-all duration-200 ${getAccessibilityClasses()}`} id="app-root">
       {/* Top Header */}
       <header className="border-b border-[#E5E1D8] bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -351,9 +402,32 @@ export default function App() {
             {/* Destination Billboard Banner */}
             <div className="bg-white border border-[#E5E1D8] rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 card-shadow relative overflow-hidden">
               <div className="space-y-2 max-w-3xl">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#7D7C6E] uppercase tracking-wider">
-                  <MapPin className="w-4 h-4 text-[#7D7C6E]" />
-                  {currentDiscovery.country}
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#7D7C6E] uppercase tracking-wider">
+                    <MapPin className="w-4 h-4 text-[#7D7C6E]" />
+                    {currentDiscovery.country}
+                  </div>
+                  {ttsSpeechEnabled && (
+                    <button
+                      onClick={() => handleToggleSpeak(`${currentDiscovery.locationName}. ${currentDiscovery.summary}`, 'billboard')}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
+                        currentlySpeaking === 'billboard'
+                          ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                          : 'bg-[#F1EFE7] border-[#E5E1D8] text-[#7D7C6E] hover:bg-[#EBE9E1]'
+                      }`}
+                      aria-label="Read description out loud"
+                    >
+                      {currentlySpeaking === 'billboard' ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5 text-rose-600 animate-pulse" /> Stop Voice
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-[#7D7C6E]" /> Listen Voice
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
                 <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#2C2926]">
                   {currentDiscovery.locationName}
@@ -489,8 +563,28 @@ export default function App() {
                               </div>
 
                               <div className="p-4 flex flex-col flex-1">
-                                <div className="flex justify-between items-start gap-2">
+                                <div className="flex justify-between items-center gap-2">
                                   <h4 className="font-serif font-bold text-[#2C2926] text-sm leading-tight">{attr.name}</h4>
+                                  {ttsSpeechEnabled && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSpeak(`${attr.name}. ${attr.description}. Historical significance: ${attr.significance}. Respectful tip: ${attr.practicalTip}`, `attr-${attr.id}`);
+                                      }}
+                                      className={`p-1.5 rounded-full border transition-all duration-150 shrink-0 cursor-pointer ${
+                                        currentlySpeaking === `attr-${attr.id}`
+                                          ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                                          : 'bg-[#F1EFE7] border-[#E5E1D8] text-[#7D7C6E] hover:bg-[#EBE9E1]'
+                                      }`}
+                                      aria-label={`Listen to details of ${attr.name}`}
+                                    >
+                                      {currentlySpeaking === `attr-${attr.id}` ? (
+                                        <VolumeX className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                                      ) : (
+                                        <Volume2 className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
                                 </div>
                                 <p className="text-xs text-[#4A443F] font-serif leading-relaxed mt-2 flex-1">
                                   {attr.description}
@@ -543,8 +637,28 @@ export default function App() {
                               </div>
 
                               <div className="p-4 flex flex-col flex-1">
-                                <div className="flex justify-between items-start gap-2">
+                                <div className="flex justify-between items-center gap-2">
                                   <h4 className="font-serif font-bold text-[#2C2926] text-sm leading-tight">{gem.name}</h4>
+                                  {ttsSpeechEnabled && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSpeak(`${gem.name}. ${gem.description}. Local secret: ${gem.localSecret}. How to find respectfully: ${gem.howToFind}`, `gem-${gem.id}`);
+                                      }}
+                                      className={`p-1.5 rounded-full border transition-all duration-150 shrink-0 cursor-pointer ${
+                                        currentlySpeaking === `gem-${gem.id}`
+                                          ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                                          : 'bg-[#F1EFE7] border-[#E5E1D8] text-[#7D7C6E] hover:bg-[#EBE9E1]'
+                                      }`}
+                                      aria-label={`Listen to details of ${gem.name}`}
+                                    >
+                                      {currentlySpeaking === `gem-${gem.id}` ? (
+                                        <VolumeX className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                                      ) : (
+                                        <Volume2 className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
                                 </div>
                                 <p className="text-xs text-[#4A443F] font-serif leading-relaxed mt-2 flex-1">
                                   {gem.description}
@@ -647,6 +761,173 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* PERSISTENT ACCESSIBILITY FLOATING PANEL */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 font-sans print:hidden">
+        {/* Toggle Panel */}
+        {isAccessibilityMenuOpen && (
+          <div 
+            className="w-80 bg-white border-2 border-[#7D7C6E] rounded-2xl p-5 shadow-2xl animate-fade-in text-[#2C2926] space-y-4"
+            id="accessibility-control-panel"
+            role="dialog"
+            aria-label="Accessibility Settings"
+          >
+            <div className="flex justify-between items-center border-b border-[#E5E1D8] pb-3">
+              <h3 className="font-serif font-bold text-sm flex items-center gap-2">
+                <Accessibility className="w-4 h-4 text-[#7D7C6E]" />
+                Accessibility Menu
+              </h3>
+              <button 
+                onClick={() => setIsAccessibilityMenuOpen(false)}
+                className="text-stone-400 hover:text-[#2C2926] text-[10px] font-bold px-2 py-1 rounded border border-[#E5E1D8] hover:bg-[#F1EFE7] cursor-pointer"
+                aria-label="Close Accessibility Settings"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Font Size controls */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-[#7D7C6E] block uppercase tracking-wider">
+                Font Sizing
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  onClick={() => setFontSize('normal')}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                    fontSize === 'normal' 
+                      ? 'border-[#7D7C6E] bg-[#7D7C6E] text-white' 
+                      : 'border-[#E5E1D8] bg-[#F8F7F2] hover:bg-[#F1EFE7]'
+                  }`}
+                  aria-pressed={fontSize === 'normal'}
+                >
+                  Standard (100%)
+                </button>
+                <button
+                  onClick={() => setFontSize('large')}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                    fontSize === 'large' 
+                      ? 'border-[#7D7C6E] bg-[#7D7C6E] text-white' 
+                      : 'border-[#E5E1D8] bg-[#F8F7F2] hover:bg-[#F1EFE7]'
+                  }`}
+                  aria-pressed={fontSize === 'large'}
+                >
+                  Large (115%)
+                </button>
+                <button
+                  onClick={() => setFontSize('huge')}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                    fontSize === 'huge' 
+                      ? 'border-[#7D7C6E] bg-[#7D7C6E] text-white' 
+                      : 'border-[#E5E1D8] bg-[#F8F7F2] hover:bg-[#F1EFE7]'
+                  }`}
+                  aria-pressed={fontSize === 'huge'}
+                >
+                  Huge (130%)
+                </button>
+              </div>
+            </div>
+
+            {/* Dyslexia / Readability Font toggle */}
+            <div className="flex items-center justify-between border-t border-[#E5E1D8]/60 pt-3">
+              <div>
+                <span className="text-xs font-bold text-[#2C2926] block">High Readability Font</span>
+                <span className="text-[9px] text-[#7D7C6E] block">Sans-serif & spacious layouts</span>
+              </div>
+              <button
+                onClick={() => setReadabilityFont(!readabilityFont)}
+                className={`w-12 h-6 rounded-full p-0.5 transition-all relative ${
+                  readabilityFont ? 'bg-[#7D7C6E]' : 'bg-stone-300'
+                }`}
+                aria-label="Toggle High Readability Font"
+                aria-pressed={readabilityFont}
+              >
+                <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-all ${
+                  readabilityFont ? 'translate-x-6' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            {/* Enhanced contrast mode toggle */}
+            <div className="flex items-center justify-between border-t border-[#E5E1D8]/60 pt-3">
+              <div>
+                <span className="text-xs font-bold text-[#2C2926] block">Enhanced Contrast Mode</span>
+                <span className="text-[9px] text-[#7D7C6E] block">High readability WCAG AAA ink</span>
+              </div>
+              <button
+                onClick={() => setHighContrast(!highContrast)}
+                className={`w-12 h-6 rounded-full p-0.5 transition-all relative ${
+                  highContrast ? 'bg-[#7D7C6E]' : 'bg-stone-300'
+                }`}
+                aria-label="Toggle Enhanced Contrast"
+                aria-pressed={highContrast}
+              >
+                <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-all ${
+                  highContrast ? 'translate-x-6' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            {/* Audio Speech Guide */}
+            <div className="flex items-center justify-between border-t border-[#E5E1D8]/60 pt-3">
+              <div>
+                <span className="text-xs font-bold text-[#2C2926] block">Read-Aloud Voice Guides</span>
+                <span className="text-[9px] text-[#7D7C6E] block">TTS voice cues on card headers</span>
+              </div>
+              <button
+                onClick={() => {
+                  setTtsSpeechEnabled(!ttsSpeechEnabled);
+                  if (ttsSpeechEnabled) {
+                    window.speechSynthesis?.cancel();
+                    setCurrentlySpeaking(null);
+                  }
+                }}
+                className={`w-12 h-6 rounded-full p-0.5 transition-all relative ${
+                  ttsSpeechEnabled ? 'bg-[#7D7C6E]' : 'bg-stone-300'
+                }`}
+                aria-label="Toggle Interactive Voice"
+                aria-pressed={ttsSpeechEnabled}
+              >
+                <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-all ${
+                  ttsSpeechEnabled ? 'translate-x-6' : 'translate-x-0'
+                }`} />
+              </button>
+            </div>
+
+            {currentlySpeaking && (
+              <div className="bg-[#F1EFE7] p-2.5 rounded-lg border border-[#E5E1D8] flex items-center justify-between">
+                <span className="text-[10px] text-[#4A443F] font-semibold animate-pulse flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-[#7D7C6E]" />
+                  Narrating details...
+                </span>
+                <button
+                  onClick={() => {
+                    window.speechSynthesis?.cancel();
+                    setCurrentlySpeaking(null);
+                  }}
+                  className="text-[10px] text-rose-700 bg-white border border-rose-150 px-2 py-0.5 rounded hover:bg-rose-50 font-bold cursor-pointer"
+                >
+                  Mute
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Floating circular activation button */}
+        <button
+          onClick={() => setIsAccessibilityMenuOpen(!isAccessibilityMenuOpen)}
+          className={`p-3.5 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 transform active:scale-95 border-2 cursor-pointer focus:ring-4 focus:ring-[#7D7C6E]/30 ${
+            isAccessibilityMenuOpen 
+              ? 'bg-[#2C2926] text-white border-[#2C2926]' 
+              : 'bg-white text-[#7D7C6E] hover:text-[#2C2926] border-[#7D7C6E]'
+          }`}
+          aria-label="Open Accessibility Menu"
+          aria-expanded={isAccessibilityMenuOpen}
+        >
+          <Accessibility className="w-6 h-6" />
+        </button>
+      </div>
     </div>
   );
 }

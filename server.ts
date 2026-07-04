@@ -19,77 +19,24 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+import { SimpleCache, RateLimiter, validateString, cleanAndParseJson } from "./serverUtils";
+
 // ----------------------------------------------------
 // UTILITIES: VALIDATION, CACHING, RATE-LIMITING
 // ----------------------------------------------------
 
-// In-Memory Simple Cache Layer for efficiency and API preservation
-interface CacheEntry<T> {
-  data: T;
-  expiry: number;
-}
-
-class SimpleCache {
-  private cache = new Map<string, CacheEntry<any>>();
-  private maxEntries = 200; // Limit entries to prevent excessive memory consumption
-  private defaultTTL = 30 * 60 * 1000; // 30 minutes in milliseconds
-
-  get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.expiry) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.data;
-  }
-
-  set<T>(key: string, data: T, ttlMs = this.defaultTTL): void {
-    if (this.cache.size >= this.maxEntries) {
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey !== undefined) {
-        this.cache.delete(oldestKey);
-      }
-    }
-    this.cache.set(key, {
-      data,
-      expiry: Date.now() + ttlMs,
-    });
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-}
-
 const apiCache = new SimpleCache();
-
-// Custom Lightweight In-Memory Rate Limiter to prevent abuse
-interface RateLimitInfo {
-  count: number;
-  resetTime: number;
-}
-const ipRequestLimits = new Map<string, RateLimitInfo>();
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX = 40; // Max 40 requests per minute per IP
+const customLimiter = new RateLimiter(60 * 1000, 40);
 
 function rateLimiter(req: express.Request, res: express.Response, next: express.NextFunction) {
   const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
-  const now = Date.now();
+  const { allowed, remaining, resetTime } = customLimiter.handle(ip);
 
-  let info = ipRequestLimits.get(ip);
-  if (!info || now > info.resetTime) {
-    info = { count: 1, resetTime: now + RATE_LIMIT_WINDOW };
-    ipRequestLimits.set(ip, info);
-  } else {
-    info.count++;
-  }
+  res.setHeader("X-RateLimit-Limit", customLimiter.getLimit());
+  res.setHeader("X-RateLimit-Remaining", remaining);
+  res.setHeader("X-RateLimit-Reset", Math.ceil(resetTime / 1000));
 
-  res.setHeader("X-RateLimit-Limit", RATE_LIMIT_MAX);
-  res.setHeader("X-RateLimit-Remaining", Math.max(0, RATE_LIMIT_MAX - info.count));
-  res.setHeader("X-RateLimit-Reset", Math.ceil(info.resetTime / 1000));
-
-  if (info.count > RATE_LIMIT_MAX) {
+  if (!allowed) {
     return res.status(429).json({
       error: "Too many requests. Please pause, take a deep breath, and try again in a moment."
     });
@@ -99,53 +46,8 @@ function rateLimiter(req: express.Request, res: express.Response, next: express.
 
 // Prune expired rate limit records periodically to prevent memory footprint creep
 setInterval(() => {
-  const now = Date.now();
-  for (const [ip, info] of ipRequestLimits.entries()) {
-    if (now > info.resetTime) {
-      ipRequestLimits.delete(ip);
-    }
-  }
+  customLimiter.prune();
 }, 5 * 60 * 1000).unref();
-
-// Helper to strictly validate and sanitize strings
-function validateString(val: any, name: string, maxLen = 200, required = false): string {
-  if (val === undefined || val === null) {
-    if (required) {
-      throw new Error(`${name} is required.`);
-    }
-    return "";
-  }
-  if (typeof val !== "string") {
-    throw new Error(`${name} must be a valid string.`);
-  }
-  const clean = val.trim();
-  if (required && clean.length === 0) {
-    throw new Error(`${name} cannot be empty.`);
-  }
-  if (clean.length > maxLen) {
-    throw new Error(`${name} must not exceed ${maxLen} characters.`);
-  }
-  return clean;
-}
-
-// Helper to clean up backticks / markdown wrappers and safely parse JSON
-function cleanAndParseJson(text: string): any {
-  if (!text) {
-    throw new Error("Received empty response from the AI model.");
-  }
-  let cleaned = text.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\n?/i, "");
-    cleaned = cleaned.replace(/\n?```$/i, "");
-    cleaned = cleaned.trim();
-  }
-  try {
-    return JSON.parse(cleaned);
-  } catch (err: any) {
-    console.error("AI response is not valid JSON:", cleaned);
-    throw new Error(`Failed to parse AI response as JSON: ${err.message}`);
-  }
-}
 
 // Mount Rate Limiter globally for custom API endpoints
 app.use("/api", rateLimiter);
