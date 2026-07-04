@@ -1,0 +1,6 @@
+{
+  "name": "CultureQuest",
+  "description": "An interactive, GenAI-powered platform to discover authentic cultural destinations, uncover heritage hidden gems, hear ancient folklore, learn local etiquette, and converse with a virtual guide.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
